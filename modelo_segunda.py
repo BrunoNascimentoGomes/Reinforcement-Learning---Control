@@ -35,7 +35,7 @@ class ModeloSegundaOrdem:
 
         self.norm_limits = {
             'y':  (0.0, 10.0),      # Saída
-            'dy': (-20.0,20.0),
+            'dy': (-10.0,10.0),
             'sp': (0.0, 10.0),      # Setpoint
             'u':  (-10, 10),      # Ação absoluta
             'e':  (-10.0, 10.0),    # Erro
@@ -75,8 +75,7 @@ class ModeloSegundaOrdem:
             self._normalize(0.0, 'y'),
             self._normalize(0.0,'du'),
             self._normalize(self.setpoint,'sp'),
-            self._normalize(self.integral_error,'int_e'),
-            self._normalize(0.0, 'dy')], 
+            self._normalize(self.integral_error,'int_e')], 
             dtype=np.float32)
         return obs, {}
 
@@ -103,8 +102,6 @@ class ModeloSegundaOrdem:
         self.num_step += 1
 
         y = float(self.state[0])
-        dy = float(self.state[1])
-
         error = float(self.setpoint - y)
         self.integral_error += error * self.dt
         self.integral_error = np.clip(self.integral_error, -50.0, 50.0)
@@ -121,28 +118,22 @@ class ModeloSegundaOrdem:
             self._normalize(y,'y'), 
             self._normalize(delta_u,'du'),
             self._normalize(self.setpoint,'sp'),
-            self._normalize(self.integral_error, 'int_e'),
-            self._normalize(dy, 'dy')], 
+            self._normalize(self.integral_error, 'int_e')], 
             dtype=np.float32)
         
-        fator_penalidade = 0.1
+        fator_penalidade = 1.0
         #Mudei a recompensa para penalizar não admitir mudanças bruscas de
         #u. 
         # Original: reward = -float(error ** 2) - fator_penalidade*float(delta_u**2) if abs(error) > self.tol else 10
         
         #reward = -abs(float(error)) - fator_penalidade*float(delta_u**2) if abs(error) > self.tol else 10 
-        fator_erro = 1
+        fator_erro = 5
         reward = - fator_erro*float(error**2) - fator_penalidade*(delta_u**2) 
-        
         if abs(error) < self.tol:
-            reward += 1 # Bônus extra por atingir o alvo
+            reward += 10.0 # Bônus extra por atingir o alvo
         
         #Terminated or Truncated
         terminated = False
-        
-        if y > 15 or y < -5:
-            terminated = True
-            reward += -1000
         truncated = self.num_step >= self.max_steps
 
         info = {

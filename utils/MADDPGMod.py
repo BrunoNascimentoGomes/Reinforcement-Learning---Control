@@ -163,3 +163,166 @@ class MADDPG:
             agent.critic_target.load_state_dict(agent.critic.state_dict())
             
         print(f"--- Modelos carregados com sucesso de {dir_path} ---")
+
+
+
+class MADDPG_Done:
+    def __init__(self, num_agents, state_dim, action_dim, max_action,
+                 buffer, actor_lr=0.0001, critic_lr=0.0002,
+                 gamma=0.99, tau=0.005, device="cpu"):
+        #Garantir que o Buffer usado é o BufferMaddpg_Done
+        self.device = device
+        self.num_agents = num_agents
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.gamma = gamma
+        self.tau = tau
+        self.replay_buffer = buffer
+        self.batch_size = buffer.batch_size
+
+        # criar agentes
+        self.agents = []
+        for i in range(num_agents):
+            self.agents.append(
+                Agente(i, state_dim, action_dim,
+                       max_action, num_agents,
+                       device=device,
+                       actor_lr=actor_lr,
+                       critic_lr=critic_lr)
+            )
+
+    # ---------------------------------------------------------
+    # AÇÃO
+    # ---------------------------------------------------------
+    def select_action(self, states, noise=0.0, deterministic=False):
+        actions = []
+        for i, agent in enumerate(self.agents):
+            a = agent.select_action(states[i], noise, deterministic)
+            actions.append(np.array(a).reshape(self.action_dim))
+        return np.array(actions)
+
+    # ---------------------------------------------------------
+    # TREINO
+    # ---------------------------------------------------------
+    def train(self):
+
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = \
+            self.replay_buffer.sample_batch()
+
+        state_batch = state_batch.to(self.device)               # 
+        action_batch = action_batch.to(self.device)             
+        reward_batch = reward_batch.to(self.device)             
+        next_state_batch = next_state_batch.to(self.device)   
+        done_batch = done_batch.to(self.device)  
+
+        B = state_batch.size(0)
+        
+
+        # ---------------------------------------------------------
+        # AÇÕES TARGET
+        # ---------------------------------------------------------
+        with torch.no_grad():
+            next_actions = []
+            for agent in self.agents:
+                ns_i = next_state_batch[:, agent.id, :]         # [B, S]
+                next_actions.append(agent.actor_target(ns_i))   # [B, A]
+
+            next_actions = torch.stack(next_actions, dim=1)     # [B, N, A]
+
+            next_states_flat = next_state_batch.view(B, -1)
+            next_actions_flat = next_actions.view(B, -1)
+
+        # ---------------------------------------------------------
+        # ATUALIZAÇÃO POR AGENTE
+        # ---------------------------------------------------------
+        for agent in self.agents:
+            agent_id = agent.id
+
+            # ---------------- Critic ----------------
+            with torch.no_grad():
+                reward_i = reward_batch[:, agent_id, :]
+                done_i = done_batch[:, agent_id, :]
+
+                target_Q = agent.critic_target(next_states_flat,
+                                               next_actions_flat)
+
+                target_Q = reward_i + ((1-done_i)*self.gamma * target_Q)
+
+            state_flat = state_batch.view(B, -1)
+            action_flat = action_batch.view(B, -1)
+
+            current_Q = agent.critic(state_flat, action_flat)
+
+            critic_loss = nn.MSELoss()(current_Q, target_Q)
+
+            agent.critic_optimizer.zero_grad()
+            critic_loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.critic.parameters(), 1.0) #Clip no gradiente
+            agent.critic_optimizer.step()
+
+            # ---------------- Actor ----------------
+            pred_actions = []
+
+            for j, other_agent in enumerate(self.agents):
+                s_j = state_batch[:, j, :]
+
+                if j == agent_id:
+                    a_j = other_agent.actor(s_j)
+                else:
+                    with torch.no_grad():
+                        a_j = other_agent.actor(s_j)
+
+                pred_actions.append(a_j)
+
+            pred_actions_flat = torch.cat(pred_actions, dim=1)
+
+            actor_loss = -agent.critic(state_flat,
+                                       pred_actions_flat).mean()
+
+            agent.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.actor.parameters(), 1.0) # Clip no gradiente
+            agent.actor_optimizer.step()
+
+            # ---------------- Soft Update ----------------
+            with torch.no_grad():
+                for p, tp in zip(agent.critic.parameters(),
+                                 agent.critic_target.parameters()):
+                    tp.data.copy_(self.tau*p.data + (1-self.tau)*tp.data)
+
+                for p, tp in zip(agent.actor.parameters(),
+                                 agent.actor_target.parameters()):
+                    tp.data.copy_(self.tau*p.data + (1-self.tau)*tp.data)
+
+
+    def save(self, dir_path):
+        os.makedirs(dir_path, exist_ok=True)
+
+        for agent in self.agents:
+            torch.save(agent.actor.state_dict(),
+                       f"{dir_path}/agent{agent.id}_actor.pth")
+
+            torch.save(agent.critic.state_dict(),
+                       f"{dir_path}/agent{agent.id}_critic.pth")
+
+            torch.save(agent.actor_optimizer.state_dict(),
+                       f"{dir_path}/agent{agent.id}_actor_optim.pth")
+
+            torch.save(agent.critic_optimizer.state_dict(),
+                       f"{dir_path}/agent{agent.id}_critic_optim.pth")
+    
+    def load(self, dir_path):
+        for agent in self.agents:
+            # Carregar Pesos das Redes
+            agent.actor.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_actor.pth", map_location=self.device))
+            agent.critic.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_critic.pth", map_location=self.device))
+            
+            # Carregar Estado dos Otimizadores (Importante para continuar treino)
+            agent.actor_optimizer.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_actor_optim.pth", map_location=self.device))
+            agent.critic_optimizer.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_critic_optim.pth", map_location=self.device))
+
+            # Atualizar as redes Target para ficarem iguais às carregadas
+            agent.actor_target.load_state_dict(agent.actor.state_dict())
+            agent.critic_target.load_state_dict(agent.critic.state_dict())
+            
+        print(f"--- Modelos carregados com sucesso de {dir_path} ---")

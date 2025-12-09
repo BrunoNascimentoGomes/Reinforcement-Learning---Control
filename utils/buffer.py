@@ -181,7 +181,57 @@ class Buffer_Done:
         self.done_buffer.fill(0)
 
         
+class BufferMADDPG_Done:
+    def __init__(self, buffer_capacity=10000, batch_size=64,
+                 state_dim=4, action_dim=1, num_agents=2):
 
+        self.buffer_capacity = buffer_capacity
+        self.batch_size = batch_size
+        self.buffer_counter = 0
+
+        self.num_agents = num_agents
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+        self.state_buffer = np.zeros((buffer_capacity, num_agents, state_dim))
+        self.action_buffer = np.zeros((buffer_capacity, num_agents, action_dim))
+        self.reward_buffer = np.zeros((buffer_capacity, num_agents, 1))
+        self.next_state_buffer = np.zeros((buffer_capacity, num_agents, state_dim))
+        self.done_buffer = np.zeros((buffer_capacity, num_agents, 1))
+
+    def record(self, obs_tuple):
+ 
+
+        idx = self.buffer_counter % self.buffer_capacity
+
+        self.state_buffer[idx] = np.array(obs_tuple[0]).reshape(self.num_agents, self.state_dim)
+        self.action_buffer[idx] = np.array(obs_tuple[1]).reshape(self.num_agents, self.action_dim)
+        self.reward_buffer[idx] = np.array(obs_tuple[2]).reshape(self.num_agents, 1)
+        self.next_state_buffer[idx] = np.array(obs_tuple[3]).reshape(self.num_agents, self.state_dim)
+        self.done_buffer[idx] = np.array(obs_tuple[4]).reshape(self.num_agents, 1)
+
+        self.buffer_counter += 1
+
+
+    def sample_batch(self):
+        max_samples = min(self.buffer_counter, self.buffer_capacity)
+        batch_indices = np.random.choice(max_samples, self.batch_size, replace=False)
+
+        state_batch = torch.tensor(self.state_buffer[batch_indices], dtype=torch.float32)
+        action_batch = torch.tensor(self.action_buffer[batch_indices], dtype=torch.float32)
+        reward_batch = torch.tensor(self.reward_buffer[batch_indices], dtype=torch.float32)
+        next_state_batch = torch.tensor(self.next_state_buffer[batch_indices], dtype=torch.float32)
+        done_batch = torch.tensor(self.done_buffer[batch_indices], dtype=torch.float32)
+
+        return state_batch, action_batch, reward_batch, next_state_batch, done_batch 
+
+
+    def reset(self):
+        self.buffer_counter = 0
+        self.state_buffer.fill(0)
+        self.action_buffer.fill(0)
+        self.reward_buffer.fill(0)
+        self.next_state_buffer.fill(0)
 
 
 
