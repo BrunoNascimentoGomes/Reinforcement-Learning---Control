@@ -58,10 +58,11 @@ class Agente:
 
         # limita ação ao intervalo permitido
         #Normal
-        #action = np.clip(action, -self.max_action, self.max_action)
+        action = np.clip(action, -self.max_action, self.max_action)
 
         #Para o PettingZoo
-        action = np.clip(action, 0.0, 1)
+        #action = np.clip(action, 0.0, 1)
+        
         action = action.astype(np.float32)
 
 

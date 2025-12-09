@@ -14,19 +14,25 @@ class ActorNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(ActorNetwork, self).__init__()
         self.fc1 = nn.Linear(state_dim, 400)
+        self.bn1 = nn.LayerNorm(400)
+        
         self.fc2 = nn.Linear(400, 300)
+        self.bn2 = nn.LayerNorm(300)
+        
         self.fc3 = nn.Linear(300, action_dim)
         self.max_action = max_action
     
     def forward(self, state):
-        x = torch.relu(self.fc1(state))
-        x = torch.relu(self.fc2(x))
-
-        #Para o PettingZoo
-        x = torch.sigmoid(self.fc3(x))
+        x = self.fc1(state)
+        x = self.bn1(x)
+        x = torch.relu(x)
         
-        #Para o normal
-        #x = self.max_action * torch.tanh(self.fc3(x))
+        x = self.fc2(x)
+        x = self.bn2(x)
+        x = torch.relu(x)
+
+        # Saída (sem BN aqui, pois usamos tanh e queremos o range da ação)
+        x = self.max_action * torch.tanh(self.fc3(x))
 
         return x
 
@@ -34,13 +40,22 @@ class CriticNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(CriticNetwork, self).__init__()
         self.fc1 = nn.Linear(state_dim + action_dim, 400)
+        self.bn1 = nn.LayerNorm(400) # <--- Adicionado
         self.fc2 = nn.Linear(400, 300)
+        self.bn2 = nn.LayerNorm(300)
         self.fc3 = nn.Linear(300, 1)
     
     def forward(self, state, action):
-        x = torch.cat([state, action],1)
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
+        x = torch.cat([state, action], 1)
+        
+        x = self.fc1(x)
+        x = self.bn1(x)
+        x = torch.relu(x)
+        
+        x = self.fc2(x)
+        x = self.bn2(x)
+        x = torch.relu(x)
+        
         x = self.fc3(x)
         return x
 
@@ -48,7 +63,9 @@ class CriticNetworkMADDPG(nn.Module):
     def __init__(self, state_dim, action_dim, num_agents):
         super(CriticNetworkMADDPG, self).__init__()
         self.fc1 = nn.Linear(state_dim * num_agents+ action_dim*num_agents, 400)
+        self.bn1 = nn.LayerNorm(400) # <--- Adicionado
         self.fc2 = nn.Linear(400, 300)
+        self.bn2 = nn.LayerNorm(300)
         self.fc3 = nn.Linear(300, 1)
     
     def forward(self, state, action):
@@ -60,10 +77,22 @@ class CriticNetworkMADDPG(nn.Module):
 
         action: [batch_size, action_dim * num_agents]'''
         x = torch.cat([state, action],1)
+        '''
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = self.fc3(x)
+        '''
+        x = self.fc1(x)
+        x = self.bn1(x)
+        x = torch.relu(x)
+        
+        x = self.fc2(x)
+        x = self.bn2(x)
+        x = torch.relu(x)
+        
+        x = self.fc3(x)
         return x
+        
     
 # ---------------------------------GITHUB--------------------------------
 

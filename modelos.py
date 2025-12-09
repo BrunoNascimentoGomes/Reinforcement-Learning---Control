@@ -2,6 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
+
 class ModeloSegundaOrdem:
     def __init__(self, K, wn, zeta, dt=0.01, setpoint=0, max_steps=1000, render_mode = None, tol = 1e-3):
         
@@ -30,6 +31,29 @@ class ModeloSegundaOrdem:
         self.num_hist = []
         self.setpoint_hist = []
         self.error_hist = []
+        self.integral_error = 0.0
+
+        self.norm_limits = {
+            'y':  (0.0, 10.0),      # Saída
+            'dy': (-10.0,10.0),
+            'sp': (0.0, 10.0),      # Setpoint
+            'u':  (-10, 10),      # Ação absoluta
+            'e':  (-10.0, 10.0),    # Erro
+            'du': (-20.0, 20.0),       # Variação da ação (Delta U)
+            'int_e':(-50,50)
+        }
+    def _normalize(self, value, key):
+        min_v, max_v = self.norm_limits[key]
+        # Clipa para garantir que não passe dos limites e estrague a rede
+        return 2 * (value - min_v) / (max_v - min_v) - 1
+
+    # Função auxiliar para desnormalizar (Ação do Agente -> Física)
+    def _denormalize_action(self, action_norm):
+        # O agente entrega [-1, 1], convertemos para [u_min, u_max]
+        min_v, max_v = self.norm_limits['u']
+        # Fórmula inversa
+        action_phys = 0.5 * (action_norm + 1) * (max_v - min_v) + min_v
+        return action_phys
     
     def reset(self, x1 = 0.0, x2 = 0.0):
 
@@ -41,10 +65,17 @@ class ModeloSegundaOrdem:
         self.num_hist = []
         self.setpoint_hist = []
         self.error_hist = []
-
+        self.last_u = 0
+        self.integral_error = 0.0
         
 
-        obs = np.array([self.setpoint - 0.0, 0.0, 0.0, self.setpoint], dtype=np.float32)
+        obs = np.array([
+            self._normalize(self.setpoint - 0.0,'e'), 
+            self._normalize(0.0, 'y'),
+            self._normalize(0.0,'du'),
+            self._normalize(self.setpoint,'sp'),
+            self._normalize(self.integral_error,'int_e')], 
+            dtype=np.float32)
         return obs, {}
 
     
@@ -55,40 +86,50 @@ class ModeloSegundaOrdem:
         dx2dt = -2*self.zeta*self.wn*x2 - (self.wn**2)*x1 + (self.wn**2)*self.K*u
         return [dx1dt, dx2dt]
     
-    def step(self, u):
-        u = np.asarray(u, dtype=float).reshape(-1)[0]
-        sol = solve_ivp(self._ode, [self.t, self.t + self.dt], self.state, t_eval=[self.t + self.dt], args=(u,), method='RK45')
+    
+    def step(self, action_norm):
         
+        u_phys = self._denormalize_action(np.array(action_norm).reshape(-1))
+        u_phys = u_phys.item()
+        sol = solve_ivp(self._ode, [self.t, self.t + self.dt], self.state, t_eval=[self.t + self.dt], args=(u_phys,), method='RK45')
+        
+        delta_u = u_phys -self.last_u
+        self.last_u = u_phys
+
         self.state = sol.y[:, -1]
         self.t += self.dt
         self.num_step += 1
 
         y = float(self.state[0])
         error = float(self.setpoint - y)
-
-        #Delta error e delta u
-        delta_e = error - (self.error_hist[-1] if self.error_hist else 0.0)
-        delta_u = u - (self.u_hist[-1] if self.u_hist else 0.0)
-
-        #Delta_y
-        delta_y = y - self.y_hist[-1] if self.y_hist else 0.0
-       
+        self.integral_error += error * self.dt
+        self.integral_error = np.clip(self.integral_error, -50.0, 50.0)
 
         self.num_hist.append(self.num_step)
         self.y_hist.append(y)
-        self.u_hist.append(u)
+        self.u_hist.append(u_phys)
         self.setpoint_hist.append(self.setpoint)
         self.error_hist.append(error)
         
         # observation & reward
-        obs = np.array([error, y, delta_e, self.setpoint], dtype=np.float32)
+        obs = np.array([
+            self._normalize(error,'e'),
+            self._normalize(y,'y'), 
+            self._normalize(delta_u,'du'),
+            self._normalize(self.setpoint,'sp'),
+            self._normalize(self.integral_error, 'int_e')], 
+            dtype=np.float32)
         
-        fator_penalidade = 0.01
+        fator_penalidade = 1.0
         #Mudei a recompensa para penalizar não admitir mudanças bruscas de
         #u. 
         # Original: reward = -float(error ** 2) - fator_penalidade*float(delta_u**2) if abs(error) > self.tol else 10
-        reward = -abs(float(error)) - fator_penalidade*float(delta_u**2) if abs(error) > self.tol else 10 
-        #reward = -float(error**2)  if abs(error) > self.tol else 10
+        
+        #reward = -abs(float(error)) - fator_penalidade*float(delta_u**2) if abs(error) > self.tol else 10 
+        fator_erro = 5
+        reward = - fator_erro*float(error**2) - fator_penalidade*(delta_u**2) 
+        if abs(error) < self.tol:
+            reward += 10.0 # Bônus extra por atingir o alvo
         
         #Terminated or Truncated
         terminated = False
@@ -96,7 +137,7 @@ class ModeloSegundaOrdem:
 
         info = {
             "time": float(self.t),
-            "u_applied": u,
+            "u_applied": u_phys,
             "y": y,
         }
 

@@ -94,6 +94,7 @@ class MADDPG:
 
             agent.critic_optimizer.zero_grad()
             critic_loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.critic.parameters(), 1.0) #Clip no gradiente
             agent.critic_optimizer.step()
 
             # ---------------- Actor ----------------
@@ -117,6 +118,7 @@ class MADDPG:
 
             agent.actor_optimizer.zero_grad()
             actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.actor.parameters(), 1.0) # Clip no gradiente
             agent.actor_optimizer.step()
 
             # ---------------- Soft Update ----------------
@@ -145,3 +147,19 @@ class MADDPG:
 
             torch.save(agent.critic_optimizer.state_dict(),
                        f"{dir_path}/agent{agent.id}_critic_optim.pth")
+    
+    def load(self, dir_path):
+        for agent in self.agents:
+            # Carregar Pesos das Redes
+            agent.actor.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_actor.pth", map_location=self.device))
+            agent.critic.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_critic.pth", map_location=self.device))
+            
+            # Carregar Estado dos Otimizadores (Importante para continuar treino)
+            agent.actor_optimizer.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_actor_optim.pth", map_location=self.device))
+            agent.critic_optimizer.load_state_dict(torch.load(f"{dir_path}/agent{agent.id}_critic_optim.pth", map_location=self.device))
+
+            # Atualizar as redes Target para ficarem iguais às carregadas
+            agent.actor_target.load_state_dict(agent.actor.state_dict())
+            agent.critic_target.load_state_dict(agent.critic.state_dict())
+            
+        print(f"--- Modelos carregados com sucesso de {dir_path} ---")
