@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import math
 
 class Quatro_Tanques:
-    def __init__(self, dt=4, render_mode=None, setpoint=[6.2,6.35], max_steps=500, tol=0.05):
+    def __init__(self, dt=4, render_mode=None, setpoint=[6.2,6.35], max_steps=500, tol=0.005):
         
         self.dt = dt
         self.state = np.array([6.2,6.35,0.4836,1.1440], dtype = float)

@@ -31,7 +31,7 @@ TAU = 0.001
 
 BUFFER_CAPACITY = 50000
 BATCH_SIZE = 64
-MAX_EPISODES = 1000
+MAX_EPISODES = 2000
 MAX_STEPS = 800
 max_steps = MAX_STEPS
 
@@ -73,9 +73,9 @@ best_reward = -math.inf
 SP_NOMINAL = np.array([6.2, 6.35], dtype=np.float32)
 
 CURRICULUM = [
-    dict(name="Fase 1 (easy)",   episodes=250, delta=0.25, max_steps=200, noise_start=0.15, noise_floor=0.02),
-    dict(name="Fase 2 (medium)", episodes=350, delta=1.00, max_steps=350, noise_start=0.12, noise_floor=0.015),
-    dict(name="Fase 3 (hard)",   episodes=400, delta=2.50, max_steps=500, noise_start=0.10, noise_floor=0.01),
+    dict(name="Fase 1 (easy)",   episodes=350, delta=0.25, max_steps=200, noise_start=0.15, noise_floor=0.02),
+    dict(name="Fase 2 (medium)", episodes=450, delta=1.00, max_steps=350, noise_start=0.12, noise_floor=0.015),
+    dict(name="Fase 3 (hard)",   episodes=1200, delta=2.50, max_steps=500, noise_start=0.10, noise_floor=0.01),
 ]
 
 SP_MIN = np.array([0.5, 0.5], dtype=np.float32)

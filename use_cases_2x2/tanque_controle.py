@@ -68,7 +68,7 @@ maddpg = MADDPG_Done(
 )
 
 #maddpg.load("use_cases_2x2/maddpg_tito_parcial6")
-maddpg.load("use_cases_2x2/maddpg_tito_best2")
+maddpg.load("use_cases_2x2/maddpg_tito_best3")
          
 
 
