@@ -13,9 +13,19 @@ max_action: valor máximo permitido para a ação
 class ActorNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(ActorNetwork, self).__init__()
+<<<<<<< Updated upstream
         self.fc1 = nn.Linear(state_dim, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, action_dim)
+=======
+        self.fc1 = nn.Linear(state_dim, 64) #400
+        self.bn1 = nn.LayerNorm(64) #400
+        
+        self.fc2 = nn.Linear(64, 64) #400,300
+        self.bn2 = nn.LayerNorm(64) #300
+        
+        self.fc3 = nn.Linear(64, action_dim) #300,action_dim
+>>>>>>> Stashed changes
         self.max_action = max_action
     
     def forward(self, state):
@@ -33,10 +43,19 @@ class ActorNetwork(nn.Module):
 class CriticNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(CriticNetwork, self).__init__()
+<<<<<<< Updated upstream
         self.fc1 = nn.Linear(state_dim + action_dim, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, 1)
     
+=======
+        self.fc1 = nn.Linear(state_dim + action_dim, 128) #400
+        self.bn1 = nn.LayerNorm(128) #400
+        self.fc2 = nn.Linear(128, 128) #400,300
+        self.bn2 = nn.LayerNorm(128) #300
+        self.fc3 = nn.Linear(128, 1) #300
+
+>>>>>>> Stashed changes
     def forward(self, state, action):
         x = torch.cat([state, action],1)
         x = torch.relu(self.fc1(x))
@@ -47,9 +66,17 @@ class CriticNetwork(nn.Module):
 class CriticNetworkMADDPG(nn.Module):
     def __init__(self, state_dim, action_dim, num_agents):
         super(CriticNetworkMADDPG, self).__init__()
+<<<<<<< Updated upstream
         self.fc1 = nn.Linear(state_dim * num_agents+ action_dim*num_agents, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, 1)
+=======
+        self.fc1 = nn.Linear(state_dim * num_agents+ action_dim*num_agents, 64) #400
+        self.bn1 = nn.LayerNorm(64) #400
+        self.fc2 = nn.Linear(64, 64) #400,300
+        self.bn2 = nn.LayerNorm(64) #300
+        self.fc3 = nn.Linear(64, 1) #300,1
+>>>>>>> Stashed changes
     
     def forward(self, state, action):
         '''

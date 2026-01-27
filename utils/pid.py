@@ -15,11 +15,11 @@ class PID:
         self.u_max = u_max
     
     def compute(self, error):
-        self.integral += error*self.dt   
+        self.integral += error*self.dt*self.Ki   
         derivative = (error - self.prev_error) / self.dt
 
         # PID
-        u = self.Kp*error + self.Ki*self.integral + self.Kd*derivative
+        u = self.Kp*error + self.integral + self.Kd*derivative
 
         # atualiza
         self.prev_error = error

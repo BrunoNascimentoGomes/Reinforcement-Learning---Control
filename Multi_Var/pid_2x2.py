@@ -2,7 +2,7 @@ from utils.pid import PID
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from modelo_2x2 import TITOSystem
+from tito_sys.modelo_2x2 import TITOSystem
 
 pid1 = PID(Kp=0.1, Ki=0.05, Kd=0, u_max=6, u_min=-6, dt=0.1)
 pid2 = PID(Kp=1, Ki=0.1, Kd=0, u_max=6, u_min=-6, dt=0.1)

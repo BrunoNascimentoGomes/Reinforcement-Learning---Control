@@ -279,7 +279,7 @@ if __name__ == "__main__":
     obs = env.reset()
     #print(env.x)
     
-    for _ in range(100000):
+    for _ in range(1000):
         obs = env.step([Lr, Vs])
 
     #print(env.xd_hist[-1], env.xb_hist[-1])

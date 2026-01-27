@@ -1,5 +1,5 @@
 # treino_2x2_fixed.py
-from modelo_2x2 import TITOSystem
+from tito_sys.modelo_2x2 import TITOSystem
 import numpy as np
 import torch
 from utils.MADDPGAgent import MADDPGAgent
