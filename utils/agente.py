@@ -1,5 +1,6 @@
 from utils.networks import ActorNetwork, CriticNetworkMADDPG
 from utils.buffer import BufferMADDPG
+from utils.noise import OUNoise
 import torch
 import numpy as np
 import torch.nn as nn
@@ -30,7 +31,17 @@ class Agente:
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
     
+        # Parâmetros do ruído OU
+        ou_theta=0.15 
+        ou_sigma=0.20
+        ou_dt=1.0
 
+
+        self.ou_noise = OUNoise(
+            action_dim=action_dim, theta=ou_theta,
+            sigma=ou_sigma,
+            dt=ou_dt)
+        
     def select_action(self, state, noise=0.0, deterministic=False):
         """
         Retorna ação a partir de um estado. Suporta 1D ou 2D.
@@ -54,8 +65,8 @@ class Agente:
 
         # aplica ruído só quando NÃO é determinístico
         if not deterministic:
-            action = action + np.random.normal(0, noise, size=self.action_dim)
-
+            #action = action + np.random.normal(0, noise, size=self.action_dim)
+            action = action + self.ou_noise.sample()
         # limita ação ao intervalo permitido
         #Normal
         #action = np.clip(action, -self.max_action, self.max_action)
