@@ -69,10 +69,11 @@ class Agente:
             action = action + self.ou_noise.sample()
         # limita ação ao intervalo permitido
         #Normal
-        #action = np.clip(action, -self.max_action, self.max_action)
+        action = np.clip(action, -self.max_action, self.max_action)
 
         #Para o PettingZoo
-        action = np.clip(action, 0.0, 1)
+        #action = np.clip(action, 0.0, 1)
+        
         action = action.astype(np.float32)
 
 
